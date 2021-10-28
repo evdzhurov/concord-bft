@@ -50,6 +50,8 @@ class ReplicaAsksToLeaveViewMsg : public MessageBase {
                                            Reason r,
                                            const concordUtils::SpanContext& spanContext = {});
 
+  static std::string reasonToStr(Reason reason);
+
   void validate(const ReplicasInfo&) const override;
 
  protected:

@@ -51,6 +51,20 @@ ReplicaAsksToLeaveViewMsg* ReplicaAsksToLeaveViewMsg::create(ReplicaId senderId,
   return m;
 }
 
+std::string ReplicaAsksToLeaveViewMsg::reasonToStr(Reason reason) {
+  switch (reason) {
+    case Reason::ClientRequestTimeout:
+      return "ClientRequestTimeout";
+    case Reason::NewPrimaryGetInChargeTimeout:
+      return "NewPrimaryGetInChargeTimeout";
+    case Reason::PrimarySentBadPreProcessResult:
+      return "PrimarySentBadPreProcessResult";
+    default:
+      LOG_ERROR(VC_LOG, "Missing string value(s) for ReplicaAsksToLeaveViewMsg::Reason. Fix it!");
+      return "N/A";
+  }
+}
+
 void ReplicaAsksToLeaveViewMsg::validate(const ReplicasInfo& repInfo) const {
   auto sigManager = SigManager::instance();
   auto totalSize = sizeof(Header) + spanContextSize();

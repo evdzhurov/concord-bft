@@ -839,7 +839,7 @@ void ReplicaImp::onMessage<PrePrepareMsg>(PrePrepareMsg *msg) {
   if (!getReplicaConfig().prePrepareFinalizeAsyncEnabled) {
     if (!validatePreProcessedResults(msg, getCurrentView())) {
       // trigger view change
-      LOG_ERROR(VC_LOG, "PreProcessResult Signature failure. Ask to leave view" << KVLOG(getCurrentView()));
+      LOG_WARN(VC_LOG, "PreProcessResult Signature failure. Ask to leave view" << KVLOG(getCurrentView()));
       askToLeaveView(ReplicaAsksToLeaveViewMsg::Reason::PrimarySentBadPreProcessResult);
       return;
     }
@@ -1358,7 +1358,10 @@ void ReplicaImp::onInternalMsg(InternalMessage &&msg) {
       return;
     } else {
       // trigger view change
-      LOG_ERROR(VC_LOG, "PreProcessResult Signature failure. Ask to leave view" << KVLOG(getCurrentView()));
+      LOG_WARN(VC_LOG,
+               "Received ViewChangeIndicatorInternalMsg with reason "
+                   << ReplicaAsksToLeaveViewMsg::reasonToStr(vciim->reasonToLeave_) << ". Ask to leave view"
+                   << KVLOG(getCurrentView()));
       askToLeaveView(vciim->reasonToLeave_);
       return;
     }
