@@ -281,7 +281,7 @@ bool PreProcessor::validateMessage(MessageBase *msg) const {
     msg->validate(myReplica_.getReplicasInfo());
     return true;
   } catch (std::exception &e) {
-    LOG_ERROR(logger(), "Message validation failed: " << e.what());
+    LOG_WARN(logger(), "Message validation failed: " << e.what());
     return false;
   }
 }

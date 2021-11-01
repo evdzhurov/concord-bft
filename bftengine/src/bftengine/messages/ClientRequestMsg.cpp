@@ -106,12 +106,12 @@ void ClientRequestMsg::validateImp(const ReplicasInfo& repInfo) const {
   }
   if (!repInfo.isValidPrincipalId(clientId)) {
     msg << "Invalid clientId " << clientId;
-    LOG_ERROR(GL, msg.str());
+    LOG_WARN(GL, msg.str());
     throw std::runtime_error(msg.str());
   }
   if (!repInfo.isValidPrincipalId(this->senderId())) {
     msg << "Invalid senderId " << this->senderId();
-    LOG_ERROR(GL, msg.str());
+    LOG_WARN(GL, msg.str());
     throw std::runtime_error(msg.str());
   }
   if (isIdOfExternalClient && isClientTransactionSigningEnabled) {
@@ -129,6 +129,8 @@ void ClientRequestMsg::validateImp(const ReplicasInfo& repInfo) const {
       expectedSigLen = sigManager->getSigLength(clientId);
       if (0 == expectedSigLen) {
         msg << "Invalid expectedSigLen " << KVLOG(clientId, this->senderId());
+        // Log an actual error since we assume that there should exist an
+        // expectedSigLen for each valid clientId
         LOG_ERROR(GL, msg.str());
         throw std::runtime_error(msg.str());
       }
@@ -147,7 +149,7 @@ void ClientRequestMsg::validateImp(const ReplicasInfo& repInfo) const {
                  header->reqSignatureLength,
                  isIdOfExternalClient,
                  isClientTransactionSigningEnabled);
-    LOG_ERROR(GL, msg.str());
+    LOG_WARN(GL, msg.str());
     throw std::runtime_error(msg.str());
   }
   auto expectedMsgSize = sizeof(ClientRequestMsgHeader) + header->requestLength + header->cidLength +
@@ -155,14 +157,14 @@ void ClientRequestMsg::validateImp(const ReplicasInfo& repInfo) const {
 
   if ((msgSize < minMsgSize) || (msgSize != expectedMsgSize)) {
     msg << "Invalid msgSize: " << KVLOG(msgSize, minMsgSize, expectedMsgSize);
-    LOG_ERROR(GL, msg.str());
+    LOG_WARN(GL, msg.str());
     throw std::runtime_error(msg.str());
   }
   if (doSigVerify) {
     if (!sigManager->verifySig(
             clientId, requestBuf(), header->requestLength, requestSignature(), header->reqSignatureLength)) {
       std::stringstream msg;
-      LOG_ERROR(GL, "Signature verification failed for " << KVLOG(header->reqSeqNum, this->senderId(), clientId));
+      LOG_WARN(GL, "Signature verification failed for " << KVLOG(header->reqSeqNum, this->senderId(), clientId));
       msg << "Signature verification failed for: "
           << KVLOG(clientId,
                    this->senderId(),
