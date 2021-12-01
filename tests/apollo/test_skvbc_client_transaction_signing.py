@@ -20,6 +20,8 @@ import trio
 from util import skvbc as kvbc
 from util.bft import with_trio, with_bft_network, KEY_FILE_PREFIX
 
+from bft_client import MofNQuorum
+
 SKVBC_INIT_GRACE_TIME = 5
 
 # Comment for all positive tests:
@@ -83,10 +85,10 @@ class SkvbcTestClientTxnSigning(unittest.TestCase):
         except trio.TooSlowError as e:
             pass
 
-    async def read_n_times(self, bft_network, skvbc, num_reads, client=None):
+    async def read_n_times(self, bft_network, skvbc, num_reads, m_of_n_quorum=None, client=None):
         for i in range(num_reads):
             client = bft_network.random_client() if client == None else client
-            await client.read(skvbc.get_last_block_req())
+            await client.read(skvbc.get_last_block_req(), m_of_n_quorum=m_of_n_quorum)
 
     async def write_n_times(self, bft_network, skvbc, num_writes, client=None, pre_exec=False):
         for i in range(num_writes):
@@ -179,7 +181,11 @@ class SkvbcTestClientTxnSigning(unittest.TestCase):
         NUM_OF_SEQ_READS = 1000  # This is the minimum amount to update the aggregator
         skvbc = await self.setup_skvbc(bft_network)
 
-        await self.read_n_times(bft_network, skvbc, NUM_OF_SEQ_READS)
+        # We're expecting each replica to have processed 1000 read requests by the time read_n_times finishes.
+        # For this to be true we need to synchronize with the responses of all replicas in the cluster
+        # otherwise some replica may process its requests concurrently with assert_metrics.
+        wait_all = MofNQuorum.All(bft_network.config, bft_network.all_replicas())
+        await self.read_n_times(bft_network, skvbc, NUM_OF_SEQ_READS, wait_all)
         await self.assert_metrics(bft_network, expected_num_signatures_verified=NUM_OF_SEQ_READS)
 
     @with_trio
