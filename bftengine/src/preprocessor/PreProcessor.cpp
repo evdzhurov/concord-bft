@@ -110,15 +110,19 @@ void RequestsBatch::updateRegisteredBatchIfNeeded(const string &batchCid, const 
              "The batch needs to be updated" << KVLOG(clientId_, cid_, batchSize_, preProcessReqs.size()));
     for (const auto &regReqEntry : requestsMap_) {
       if (regReqEntry.second && regReqEntry.second->reqProcessingStatePtr) {
+        const auto seqNum = regReqEntry.second->reqProcessingStatePtr->getReqSeqNum();
         bool registeredReqFound = false;
         for (const auto &arrivedReq : preProcessReqs) {
-          if (regReqEntry.second->reqProcessingStatePtr->getReqSeqNum() == arrivedReq->reqSeqNum()) {
+          if (seqNum == arrivedReq->reqSeqNum()) {
             registeredReqFound = true;
             break;
           }
         }
-        if (!registeredReqFound)
+        if (!registeredReqFound) {
           preProcessor_.releaseClientPreProcessRequestSafe(clientId_, regReqEntry.second, CANCELLED_BY_PRIMARY);
+
+          repliesList_.remove_if([seqNum](const PreProcessReplyMsgSharedPtr &it) { return it->reqSeqNum() == seqNum; });
+        }
       }
     }
     batchSize_ = preProcessReqs.size();
