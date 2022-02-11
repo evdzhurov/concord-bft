@@ -42,7 +42,15 @@ void RequestsBatch::init() {
 
 void RequestsBatch::addReply(PreProcessReplyMsgSharedPtr replyMsg) {
   const std::lock_guard<std::mutex> lock(batchMutex_);
-  repliesList_.push_back(replyMsg);
+
+  if (repliesList_.size() < batchSize_) {
+    repliesList_.push_back(replyMsg);
+  } else {
+    LOG_DEBUG(preProcessor_.logger(),
+              "Rejected a reply over the batch size" << KVLOG(batchSize_) << KVLOG(replyMsg->getCid())
+                                                     << KVLOG(replyMsg->clientId()) << KVLOG(replyMsg->reqSeqNum())
+                                                     << KVLOG(replyMsg->reqOffsetInBatch()));
+  }
 }
 
 // Should be called under batchMutex_
@@ -185,7 +193,10 @@ void RequestsBatch::releaseReqsAndSendBatchedReplyIfCompleted() {
   PreProcessBatchReplyMsgSharedPtr batchReplyMsg;
   {
     const lock_guard<mutex> lock(batchMutex_);
-    if (repliesList_.size() != batchSize_) return;
+    if (repliesList_.size() < batchSize_) return;  // Not done yet
+
+    // Ending up with more replies than the current batch needs should never happen
+    ConcordAssert(repliesList_.size() == batchSize_);
 
     cid = cid_;
     batchSize = batchSize_.load();
