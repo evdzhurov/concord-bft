@@ -13,6 +13,7 @@
 #include "ClientReplyMsg.hpp"
 #include "assertUtils.hpp"
 #include "ReplicaConfig.hpp"
+#include "Replica.hpp"
 
 namespace bftEngine {
 namespace impl {
@@ -47,6 +48,7 @@ void ClientReplyMsg::setHeaderParameters(ReplicaId primaryId, ReqId reqSeqNum, u
   b()->replyLength = replyLength;
   b()->result = result;
   b()->replicaSpecificInfoLength = 0;
+  b()->requestFlags = 0;
 }
 
 void ClientReplyMsg::setReplyLength(uint32_t replyLength) {
@@ -59,6 +61,8 @@ void ClientReplyMsg::setReplicaSpecificInfoLength(uint32_t length) {
   ConcordAssert(length <= maxReplyLength());
   b()->replicaSpecificInfoLength = length;
 }
+
+void ClientReplyMsg::setRequestFlags(uint64_t flags) { b()->requestFlags = flags; }
 
 void ClientReplyMsg::setPrimaryId(ReplicaId primaryId) { b()->currentPrimaryId = primaryId; }
 
@@ -99,6 +103,8 @@ uint64_t ClientReplyMsg::debugHash() const {
 
   return retVal;
 }
+
+bool ClientReplyMsg::isReadOnly() const { return b()->requestFlags & MsgFlag::READ_ONLY_FLAG; }
 
 }  // namespace impl
 }  // namespace bftEngine

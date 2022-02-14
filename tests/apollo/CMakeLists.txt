@@ -159,6 +159,10 @@ add_test(NAME skvbc_byzantine_primary_preexecution_tests COMMAND sh -c
         "env ${APOLLO_TEST_ENV} BUILD_COMM_TCP_TLS=${BUILD_COMM_TCP_TLS} TEST_NAME=skvbc_byzantine_primary_preexecution_tests python3 -m unittest test_skvbc_byzantine_primary_preexecution ${TEST_OUTPUT}"
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_test(NAME skvbc_byzantine_read_only_liveness_attack_tests COMMAND sh -c
+        "env ${APOLLO_TEST_ENV} BUILD_COMM_TCP_TLS=${BUILD_COMM_TCP_TLS} TEST_NAME=skvbc_byzantine_read_only_liveness_attack_tests python3 -m unittest test_skvbc_byzantine_read_only_liveness_attack ${TEST_OUTPUT}"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 if (USE_FAKE_CLOCK_IN_TIME_SERVICE)        
     add_test(NAME skvbc_time_service COMMAND sh -c
               "env ${APOLLO_TEST_ENV} BUILD_COMM_TCP_TLS=${BUILD_COMM_TCP_TLS} TEST_NAME=skvbc_time_service python3 -m unittest test_skvbc_time_service ${TEST_OUTPUT}"

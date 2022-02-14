@@ -1,14 +1,19 @@
 cmake_minimum_required (VERSION 3.2)
 project(skvbc_replica VERSION 0.1.0.0 LANGUAGES CXX)
 
+set(byzantine_strategy_src
+	strategy/StrategyUtils.cpp
+    strategy/DropPrePreparesNoViewChangeStrategy.cpp
+	strategy/DropReadOnlyRepliesStrategy.cpp
+	strategy/MangledPreProcessResultMsgStrategy.cpp
+	strategy/ShufflePrePrepareMsgStrategy.cpp)
+
 add_executable(skvbc_replica main.cpp
 		 internalCommandsHandler.cpp
 		 setup.cpp
 		 ${concord_bft_tools_SOURCE_DIR}/KeyfileIOUtils.cpp
 		 WrapCommunication.cpp
-		 strategy/ShufflePrePrepareMsgStrategy.cpp
-		 strategy/StrategyUtils.cpp
-		 strategy/MangledPreProcessResultMsgStrategy.cpp)
+		 ${byzantine_strategy_src})
 
 if(${USE_COMM_PLAIN_TCP})
 	target_compile_definitions(skvbc_replica PUBLIC USE_COMM_PLAIN_TCP)

@@ -26,6 +26,8 @@ using bftEngine::ReplicaConfig;
 std::map<uint16_t, std::shared_ptr<IByzantineStrategy>> WrapCommunication::changeStrategy;
 
 int WrapCommunication::send(NodeNum destNode, std::vector<uint8_t>&& msg, NodeNum endpointNum) {
+  if (dropMessage(msg, destNode)) return true; /*say that the message was sent*/
+
   std::shared_ptr<MessageBase> newMsg;
   if (changeMesssage(msg, newMsg) && newMsg) {
     std::vector<uint8_t> chgMsg(newMsg->body(), newMsg->body() + newMsg->size());
@@ -37,6 +39,8 @@ int WrapCommunication::send(NodeNum destNode, std::vector<uint8_t>&& msg, NodeNu
 }
 
 std::set<NodeNum> WrapCommunication::send(std::set<NodeNum> dests, std::vector<uint8_t>&& msg, NodeNum srcEndpointNum) {
+  dropMessage(msg, dests);
+
   if (separate_communication_) {
     std::set<NodeNum> failedNodes;
     for (auto dst : dests) {
@@ -62,25 +66,72 @@ void WrapCommunication::addStrategy(uint16_t msgCode, std::shared_ptr<IByzantine
 }
 
 bool WrapCommunication::changeMesssage(std::vector<uint8_t> const& msg, std::shared_ptr<MessageBase>& newMsg) {
+  if (msg.size() < sizeof(MessageBase::Header) || msg.size() > ReplicaConfig::instance().getmaxExternalMessageSize()) {
+    LOG_FATAL(logger_, "Trying to change message with invalid size!");
+  }
+
+  auto* msgBody = (MessageBase::Header*)std::malloc(msg.size());
+  memcpy(msgBody, msg.data(), msg.size());
+  auto node = ReplicaConfig::instance().getreplicaId();
+  newMsg = std::make_shared<MessageBase>(node, msgBody, msg.size(), true);
+
   bool is_strategy_changed = false;
-  if (msg.size() <= ReplicaConfig::instance().getmaxExternalMessageSize() &&
-      msg.size() >= sizeof(MessageBase::Header)) {
-    auto* msgBody = (MessageBase::Header*)std::malloc(msg.size());
-    memcpy(msgBody, msg.data(), msg.size());
-    auto node = ReplicaConfig::instance().getreplicaId();
-    newMsg = std::make_shared<MessageBase>(node, msgBody, msg.size(), true);
-    if (newMsg) {
-      auto it = changeStrategy.find(static_cast<uint16_t>(newMsg->type()));
-      if (it != changeStrategy.end()) {
-        LOG_INFO(logger_,
-                 "Trying to change the message with type : " << newMsg->type()
-                                                             << " with sender : " << newMsg->senderId()
-                                                             << " with message size : " << newMsg->size());
-        is_strategy_changed = it->second->changeMessage(newMsg);
-      }
+  if (newMsg) {
+    auto it = changeStrategy.find(static_cast<uint16_t>(newMsg->type()));
+    if (it != changeStrategy.end()) {
+      LOG_INFO(logger_,
+               "Trying to change the message with type : " << newMsg->type() << " with sender : " << newMsg->senderId()
+                                                           << " with message size : " << newMsg->size());
+      is_strategy_changed = it->second->changeMessage(newMsg);
     }
   }
+
   return is_strategy_changed;
+}
+
+bool WrapCommunication::dropMessage(std::vector<uint8_t> const& msg, NodeNum dest) {
+  auto* msgBase = (MessageBase::Header*)msg.data();
+
+  auto it = changeStrategy.find(msgBase->msgType);
+  if (it == changeStrategy.end()) return false;
+
+  // Construct a read-only message that can be inspected by the drop strategy
+  auto node = ReplicaConfig::instance().getreplicaId();
+  MessageBase msgToDrop = MessageBase(node, msgBase, msg.size(), false /*ownerOfStorage*/);
+
+  auto* strategy = it->second.get();
+
+  if (strategy->dropMessage(msgToDrop, dest)) {
+    LOG_INFO(logger_,
+             "Dropping message due to byzantine strategy " << strategy->getStrategyName()
+                                                           << " type: " << msgToDrop.type() << " dest: " << dest);
+  }
+
+  return false;
+}
+
+void WrapCommunication::dropMessage(std::vector<uint8_t> const& msg, std::set<NodeNum>& dest) {
+  if (dest.empty()) return;
+
+  auto* msgBase = (MessageBase::Header*)msg.data();
+
+  auto it = changeStrategy.find(msgBase->msgType);
+  if (it == changeStrategy.end()) return;
+
+  // Construct a read-only message that can be inspected by the drop strategy
+  auto node = ReplicaConfig::instance().getreplicaId();
+  MessageBase msgToDrop = MessageBase(node, msgBase, msg.size(), false /*ownerOfStorage*/);
+
+  auto* strategy = it->second.get();
+
+  auto itDest = dest.begin();
+  while (itDest != dest.end()) {
+    if (strategy->dropMessage(msgToDrop, *itDest)) {
+      itDest = dest.erase(itDest);
+    } else {
+      ++itDest;
+    }
+  }
 }
 
 void WrapCommunication::addStrategies(std::string const& strategies,

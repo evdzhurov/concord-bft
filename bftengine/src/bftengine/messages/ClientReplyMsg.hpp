@@ -25,7 +25,8 @@ class ClientReplyMsg : public MessageBase {
   static_assert(sizeof(ClientReplyMsgHeader::reqSeqNum) == sizeof(ReqId), "");
   static_assert(sizeof(ClientReplyMsgHeader::currentPrimaryId) == sizeof(ReplicaId), "");
   static_assert(sizeof(ClientReplyMsgHeader::result) == sizeof(uint32_t), "");
-  static_assert(sizeof(ClientReplyMsgHeader) == 28, "ClientRequestMsgHeader is 28B");
+  static_assert(sizeof(ClientReplyMsgHeader::requestFlags) == sizeof(uint64_t), "");
+  static_assert(sizeof(ClientReplyMsgHeader) == 36, "ClientRequestMsgHeader is 36B");
 
  public:
   ClientReplyMsg(ReplicaId primaryId, ReqId reqSeqNum, ReplicaId replicaId);
@@ -50,6 +51,8 @@ class ClientReplyMsg : public MessageBase {
 
   void setReplicaSpecificInfoLength(uint32_t length);
 
+  void setRequestFlags(std::uint64_t flags);
+
   void setPrimaryId(ReplicaId primaryId);
 
   uint64_t debugHash() const;
@@ -57,6 +60,8 @@ class ClientReplyMsg : public MessageBase {
   void validate(const ReplicasInfo&) const override;
 
   void setMsgSize(MsgSize size) { MessageBase::setMsgSize(size); }
+
+  bool isReadOnly() const;
 
   ClientReplyMsgHeader* b() const { return (ClientReplyMsgHeader*)msgBody_; }
 

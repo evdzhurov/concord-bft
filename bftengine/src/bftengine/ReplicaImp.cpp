@@ -4629,6 +4629,8 @@ void ReplicaImp::executeReadOnlyRequest(concordUtils::SpanWrapper &parent_span, 
   auto span = concordUtils::startChildSpan("bft_execute_read_only_request", parent_span);
   ClientReplyMsg reply(currentPrimary(), request->requestSeqNum(), config_.getreplicaId());
 
+  reply.setRequestFlags(request->flags());
+
   uint16_t clientId = request->clientProxyId();
 
   int status = 0;
@@ -4677,6 +4679,7 @@ void ReplicaImp::executeReadOnlyRequest(concordUtils::SpanWrapper &parent_span, 
   } else {
     LOG_WARN(GL, "Received error while executing RO request. " << KVLOG(clientId, status));
   }
+  // EDJ -- Why is the replica always sending replicaId 0?
   ClientReplyMsg replyMsg(
       0, request->requestSeqNum(), single_request.outReply, single_request.outActualReplySize, status);
   send(&replyMsg, clientId);

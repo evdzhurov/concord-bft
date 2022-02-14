@@ -48,7 +48,7 @@ BATCH_REQUEST_HEADER_FMT = "<LHLL"
 # Little Endian format with no padding
 # We don't include the msg type here, since we have to read it first to
 # understand what message is incoming.
-REPLY_HEADER_FMT = "<LHQLLL"
+REPLY_HEADER_FMT = "<LHQLLLQ"
 REPLY_HEADER_SIZE = struct.calcsize(REPLY_HEADER_FMT)
 
 RequestHeader = namedtuple('RequestHeader', ['span_context_size', 'client_id', 'flags', 'op_result', 'req_seq_num',
@@ -62,7 +62,7 @@ BatchRequestHeader = namedtuple('BatchRequestHeader', ['cid', 'client_id', 'num_
 #
 # Replica specific information is not used yet, so rsi_length is always 0
 ReplyHeader = namedtuple('ReplyHeader', ['span_context_size', 'primary_id', 'req_seq_num', 'result', 'length',
-                                         'rsi_length'])
+                                         'rsi_length', 'request_flags'])
 
 class OperationResult(IntEnum):
     SUCCESS = 0

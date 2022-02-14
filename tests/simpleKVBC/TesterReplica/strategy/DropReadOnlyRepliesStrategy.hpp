@@ -12,21 +12,19 @@
 
 #pragma once
 
-#include <string>
-#include <memory>
-#include "messages/MessageBase.hpp"
-
-typedef uint64_t NodeNum;
+#include "Logger.hpp"
+#include "TesterReplica/strategy/ByzantineStrategy.hpp"
 
 namespace concord::kvbc::strategy {
-
-class IByzantineStrategy {
+class DropReadOnlyRepliesStrategy : public IByzantineStrategy {
  public:
-  virtual std::string getStrategyName() = 0;
-  virtual uint16_t getMessageCode() = 0;
-  virtual bool dropMessage(const bftEngine::impl::MessageBase& msg, NodeNum dest) { return false; }
-  virtual bool changeMessage(std::shared_ptr<bftEngine::impl::MessageBase>& msg) { return false; }
-  virtual ~IByzantineStrategy() {}
-};
+  std::string getStrategyName() override;
+  uint16_t getMessageCode() override;
+  bool dropMessage(const bftEngine::impl::MessageBase& msg, NodeNum dest) override;
+  explicit DropReadOnlyRepliesStrategy(logging::Logger& logger) : logger_(logger) {}
+  virtual ~DropReadOnlyRepliesStrategy() override {}
 
+ private:
+  logging::Logger logger_;
+};
 }  // namespace concord::kvbc::strategy
