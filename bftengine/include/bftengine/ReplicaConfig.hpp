@@ -260,6 +260,11 @@ class ReplicaConfig : public concord::serialize::SerializableFactory<ReplicaConf
                20,
                "Resetting the measurements and starting again after polling X times");
 
+  CONFIG_PARAM(enableRequestPrePrepareFromNonPrimary,
+               bool,
+               false,
+               "Enable requesting/receiving preprepare from non-primary to avoid RO request liveness attacks");
+
   // Parameter to enable/disable waiting for transaction data to be persisted.
   // Not predefined configuration parameters
   // Example of usage:

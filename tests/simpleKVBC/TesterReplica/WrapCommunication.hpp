@@ -56,7 +56,7 @@ class WrapCommunication : public ICommunication {
   bool changeMesssage(std::vector<uint8_t> const &msg, std::shared_ptr<bftEngine::impl::MessageBase> &newMsg);
   bool dropMessage(std::vector<uint8_t> const &msg, NodeNum dest);
   // Removes destinations from the set if a message should be dropped
-  void dropMessage(std::vector<uint8_t> const &msg, std::set<NodeNum> &dest);
+  void dropMessageMulticast(std::vector<uint8_t> const &msg, std::set<NodeNum> &dest);
   static void addStrategy(uint16_t msgCode,
                           std::shared_ptr<concord::kvbc::strategy::IByzantineStrategy> byzantineStrategy);
 

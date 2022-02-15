@@ -30,7 +30,8 @@ uint16_t concord::kvbc::strategy::DropPrePreparesNoViewChangeStrategy::getMessag
 
 bool concord::kvbc::strategy::DropPrePreparesNoViewChangeStrategy::dropMessage(const MessageBase&, NodeNum dest) {
   // Do not send pre-prepares to f - 1 replicas to isolate them from executing requests.
-  return dest < bftEngine::ReplicaConfig::instance().getfVal();
+  const auto& config = bftEngine::ReplicaConfig::instance();
+  return dest <= config.getfVal() + config.getcVal();
 }
 
 }  // namespace concord::kvbc::strategy

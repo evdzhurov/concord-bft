@@ -43,7 +43,8 @@ def start_replica_cmd(builddir, replica_id, view_change_timeout_milli="10000"):
            "-i", str(replica_id),
            "-s", status_timer_milli,
            "-v", view_change_timeout_milli,
-           "-x"
+           "-x",
+           "--enable-req-preprep-from-non-primary"
            ]
     if replica_id == 0 :
         cmd.extend(["-g", "DropPrePreparesNoViewChangeStrategy,DropReadOnlyRepliesStrategy"])
@@ -54,7 +55,7 @@ class SkvbcByzantineReadOnlyLivenessAttackTest(ApolloTest):
     __test__ = False  # so that PyTest ignores this test scenario
 
     @with_trio
-    @with_bft_network(start_replica_cmd, selected_configs=lambda n, f, c: f >= 1)
+    @with_bft_network(start_replica_cmd, selected_configs=lambda n, f, c: True)
     @verify_linearizability(pre_exec_enabled=True, no_conflicts=True)
     async def test_byzantine_behavior(self, bft_network, tracker):
         """

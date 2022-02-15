@@ -39,7 +39,8 @@ int WrapCommunication::send(NodeNum destNode, std::vector<uint8_t>&& msg, NodeNu
 }
 
 std::set<NodeNum> WrapCommunication::send(std::set<NodeNum> dests, std::vector<uint8_t>&& msg, NodeNum srcEndpointNum) {
-  dropMessage(msg, dests);
+  dropMessageMulticast(msg, dests);
+  if (dests.empty()) return dests;  // All dropped
 
   if (separate_communication_) {
     std::set<NodeNum> failedNodes;
@@ -105,12 +106,13 @@ bool WrapCommunication::dropMessage(std::vector<uint8_t> const& msg, NodeNum des
     LOG_INFO(logger_,
              "Dropping message due to byzantine strategy " << strategy->getStrategyName()
                                                            << " type: " << msgToDrop.type() << " dest: " << dest);
+    return true;
   }
 
   return false;
 }
 
-void WrapCommunication::dropMessage(std::vector<uint8_t> const& msg, std::set<NodeNum>& dest) {
+void WrapCommunication::dropMessageMulticast(std::vector<uint8_t> const& msg, std::set<NodeNum>& dest) {
   if (dest.empty()) return;
 
   auto* msgBase = (MessageBase::Header*)msg.data();
@@ -127,6 +129,10 @@ void WrapCommunication::dropMessage(std::vector<uint8_t> const& msg, std::set<No
   auto itDest = dest.begin();
   while (itDest != dest.end()) {
     if (strategy->dropMessage(msgToDrop, *itDest)) {
+      LOG_INFO(logger_,
+               "Dropping multicast message due to byzantine strategy "
+                   << strategy->getStrategyName() << " type: " << msgToDrop.type() << " dest: " << *itDest);
+
       itDest = dest.erase(itDest);
     } else {
       ++itDest;

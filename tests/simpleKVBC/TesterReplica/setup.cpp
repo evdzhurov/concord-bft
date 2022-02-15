@@ -39,6 +39,8 @@
 #include "strategy/ByzantineStrategy.hpp"
 #include "strategy/ShufflePrePrepareMsgStrategy.hpp"
 #include "strategy/MangledPreProcessResultMsgStrategy.hpp"
+#include "strategy/DropPrePreparesNoViewChangeStrategy.hpp"
+#include "strategy/DropReadOnlyRepliesStrategy.hpp"
 #include "WrapCommunication.hpp"
 #include "secrets_manager_enc.h"
 
@@ -90,6 +92,7 @@ std::unique_ptr<TestSetup> TestSetup::ParseArgs(int argc, char** argv) {
     std::string byzantineStrategies;
     bool is_separate_communication_mode = false;
     int addAllKeysAsPublic = 0;
+    int enableRequestPrePrepareFromNonPrimary = 0;
 
     static struct option longOptions[] = {
         {"replica-id", required_argument, 0, 'i'},
@@ -121,6 +124,7 @@ std::unique_ptr<TestSetup> TestSetup::ParseArgs(int argc, char** argv) {
         {"enable-db-checkpoint", required_argument, 0, 'h'},
         {"publish-master-key-on-startup", no_argument, (int*)&replicaConfig.publishReplicasMasterKeyOnStartup, 1},
         {"add-all-keys-as-public", no_argument, &addAllKeysAsPublic, 1},
+        {"enable-req-preprep-from-non-primary", no_argument, &enableRequestPrePrepareFromNonPrimary, 1},
         {0, 0, 0, 0}};
     int o = 0;
     int optionIndex = 0;
@@ -269,6 +273,8 @@ std::unique_ptr<TestSetup> TestSetup::ParseArgs(int argc, char** argv) {
       throw std::runtime_error("Params principals-mapping and txn-signing-key-path must be set simultaneously.");
     }
 
+    replicaConfig.enableRequestPrePrepareFromNonPrimary = enableRequestPrePrepareFromNonPrimary > 0;
+
     logging::Logger logger = logging::getLogger("skvbctest.replica");
 
     TestCommConfig testCommConfig(logger);
@@ -301,7 +307,9 @@ std::unique_ptr<TestSetup> TestSetup::ParseArgs(int argc, char** argv) {
       // Initialise all the strategies here at once.
       const std::vector<std::shared_ptr<concord::kvbc::strategy::IByzantineStrategy>> allStrategies = {
           std::make_shared<concord::kvbc::strategy::ShufflePrePrepareMsgStrategy>(logger),
-          std::make_shared<concord::kvbc::strategy::MangledPreProcessResultMsgStrategy>(logger)};
+          std::make_shared<concord::kvbc::strategy::MangledPreProcessResultMsgStrategy>(logger),
+          std::make_shared<concord::kvbc::strategy::DropPrePreparesNoViewChangeStrategy>(logger),
+          std::make_shared<concord::kvbc::strategy::DropReadOnlyRepliesStrategy>(logger)};
       WrapCommunication::addStrategies(byzantineStrategies, ',', allStrategies);
 
       std::unique_ptr<bft::communication::ICommunication> wrappedComm =

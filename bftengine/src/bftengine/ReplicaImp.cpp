@@ -1086,7 +1086,10 @@ void ReplicaImp::onMessage<PrePrepareMsg>(PrePrepareMsg *msg) {
 
   bool msgAdded = false;
 
-  if (relevantMsgForActiveView(msg) && (msg->senderId() == currentPrimary())) {
+  const bool canReceivePrePrepare =
+      (msg->senderId() == currentPrimary()) || config_.enableRequestPrePrepareFromNonPrimary;
+
+  if (canReceivePrePrepare && relevantMsgForActiveView(msg)) {
     sendAckIfNeeded(msg, msg->senderId(), msgSeqNum);
     SeqNumInfo &seqNumInfo = mainLog->get(msgSeqNum);
     const bool slowStarted = (msg->firstPath() == CommitPath::SLOW || seqNumInfo.slowPathStarted());
@@ -3587,7 +3590,7 @@ void ReplicaImp::tryToSendReqMissingDataMsg(SeqNum seqNumber, bool slowPathOnly,
   const bool routerForPartialCommit = (currentPrimary() == config_.getreplicaId());
 
   const bool missingPrePrepare = (seqNumInfo.getPrePrepareMsg() == nullptr);
-  const bool missingBigRequests = (!missingPrePrepare) && (!seqNumInfo.hasPrePrepareMsg());
+  // const bool missingBigRequests = (!missingPrePrepare) && (!seqNumInfo.hasPrePrepareMsg());
 
   ReplicaId firstRepId = 0;
   ReplicaId lastRepId = config_.getnumReplicas() - 1;
@@ -3617,17 +3620,19 @@ void ReplicaImp::tryToSendReqMissingDataMsg(SeqNum seqNumber, bool slowPathOnly,
 
     const bool missingFullProof = !slowPathOnly && !seqNumInfo.hasFastPathFullCommitProof();
 
-    bool sendNeeded = missingPartialProof || missingPartialPrepare || missingFullPrepare || missingPartialCommit ||
-                      missingFullCommit || missingFullProof;
+    bool shouldRequestPrePrepare =
+        missingPrePrepare && (destIsPrimary || config_.enableRequestPrePrepareFromNonPrimary);
 
-    if (destIsPrimary && !sendNeeded) sendNeeded = missingBigRequests || missingPrePrepare;
+    bool sendNeeded = missingPartialProof || missingPartialPrepare || missingFullPrepare || missingPartialCommit ||
+                      missingFullCommit || missingFullProof || shouldRequestPrePrepare;
+
+    // if (destIsPrimary && !sendNeeded) sendNeeded = missingBigRequests || missingPrePrepare;
 
     if (!sendNeeded) continue;
 
     reqData.resetFlags();
 
-    if (destIsPrimary && missingPrePrepare) reqData.setPrePrepareIsMissing();
-
+    if (shouldRequestPrePrepare) reqData.setPrePrepareIsMissing();
     if (missingPartialProof) reqData.setPartialProofIsMissing();
     if (missingPartialPrepare) reqData.setPartialPrepareIsMissing();
     if (missingFullPrepare) reqData.setFullPrepareIsMissing();
@@ -3659,9 +3664,11 @@ void ReplicaImp::onMessage<ReqMissingDataMsg>(ReqMissingDataMsg *msg) {
   if ((currentViewIsActive()) && (mainLog->insideActiveWindow(msgSeqNum) || mainLog->isPressentInHistory(msgSeqNum))) {
     SeqNumInfo &seqNumInfo = mainLog->getFromActiveWindowOrHistory(msgSeqNum);
 
-    PrePrepareMsg *pp = seqNumInfo.getSelfPrePrepareMsg();
+    PrePrepareMsg *pp = config_.enableRequestPrePrepareFromNonPrimary ? seqNumInfo.getPrePrepareMsg()
+                                                                      : seqNumInfo.getSelfPrePrepareMsg();
     if (msg->getPrePrepareIsMissing()) {
       if (pp != nullptr) {
+        LOG_INFO(CNSUS, "Sending PrePrepare message as a response of RFMD" << KVLOG(msgSender, msgSeqNum));
         sendAndIncrementMetric(pp, msgSender, metric_sent_preprepare_msg_due_to_reqMissingData_);
       }
     }

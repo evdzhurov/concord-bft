@@ -62,7 +62,7 @@ BatchRequestHeader = namedtuple('BatchRequestHeader', ['cid', 'client_id', 'num_
 #
 # Replica specific information is not used yet, so rsi_length is always 0
 ReplyHeader = namedtuple('ReplyHeader', ['span_context_size', 'primary_id', 'req_seq_num', 'result', 'length',
-                                         'rsi_length', 'request_flags'])
+                                         'rsi_length', 'req_flags'])
 
 class OperationResult(IntEnum):
     SUCCESS = 0
@@ -139,13 +139,13 @@ def unpack_request_header(data):
     return RequestHeader._make(struct.unpack(REQUEST_HEADER_FMT,
                                              data[MSG_TYPE_SIZE:end]))
 
-def pack_reply(primary_id, req_seq_num, msg, result=0, rsi_length=0):
+def pack_reply(primary_id, req_seq_num, msg, result=0, rsi_length=0, req_flags=0):
     """
     Take message information and a message and return a construct a buffer
     containing a serialized reply header and message.
     """
 
-    header = ReplyHeader(0, primary_id, req_seq_num, result, len(msg), rsi_length)
+    header = ReplyHeader(0, primary_id, req_seq_num, result, len(msg), rsi_length, req_flags)
     return b''.join([pack_reply_header(header), msg])
 
 def pack_reply_header(header):
