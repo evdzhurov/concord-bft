@@ -25,7 +25,7 @@ import util.eliot_logging as log
 
 SKVBC_INIT_GRACE_TIME = 2
 
-def start_replica_cmd(builddir, replica_id, view_change_timeout_milli="10000"):
+def start_replica_cmd(builddir, replica_id, view_change_timeout_milli="3000"):
     """
     Return a command that starts an skvbc replica when passed to
     subprocess.Popen.
@@ -44,7 +44,7 @@ def start_replica_cmd(builddir, replica_id, view_change_timeout_milli="10000"):
            "-s", status_timer_milli,
            "-v", view_change_timeout_milli,
            "-x",
-           "--enable-req-preprep-from-non-primary"
+           #"--enable-req-preprep-from-non-primary"
            ]
     if replica_id == 0 :
         cmd.extend(["-g", "DropPrePreparesNoViewChangeStrategy,DropReadOnlyRepliesStrategy"])
@@ -54,10 +54,11 @@ class SkvbcByzantineReadOnlyLivenessAttackTest(ApolloTest):
 
     __test__ = False  # so that PyTest ignores this test scenario
 
+    @unittest.skip("Temp disabled")
     @with_trio
-    @with_bft_network(start_replica_cmd, selected_configs=lambda n, f, c: True)
+    @with_bft_network(start_replica_cmd, selected_configs=lambda n, f, c: n == 4)
     @verify_linearizability(pre_exec_enabled=True, no_conflicts=True)
-    async def test_byzantine_behavior(self, bft_network, tracker):
+    async def test_read_only_liveness_attack_simple(self, bft_network, tracker):
         """
         Use a random client to launch read only requests.
         The Byzantine Primary performs a liveness attack on read only requests
@@ -76,6 +77,58 @@ class SkvbcByzantineReadOnlyLivenessAttackTest(ApolloTest):
         kv_reply = await skvbc.send_read_kv_set(client, key)
 
         self.assertEqual({key: val}, kv_reply)
+
+    @with_trio
+    @with_bft_network(start_replica_cmd, selected_configs=lambda n, f, c: n == 4)
+    #@verify_linearizability(pre_exec_enabled=True, no_conflicts=True)
+    async def test_read_only_liveness_attack_under_load(self, bft_network):
+        """
+        Use a random client to launch read only requests.
+        The Byzantine Primary performs a liveness attack on read only requests
+        by isolating f non-faulty replicas to execute the requests this making it difficult
+        for the client to gather n - f replies. If the protocol is resilient to the attack
+        it shouldn't cause the client to timeout and loose liveness.
+        """
+        skvbc = kvbc.SimpleKVBCProtocol(bft_network)
+        bft_network.start_all_replicas()
+        await trio.sleep(SKVBC_INIT_GRACE_TIME)
+
+        ro_client = bft_network.random_client()
+        key = skvbc.random_key()
+        num_reads = 0
+        num_read_timeouts = 0
+
+        print(f"ro_client={ro_client.client_id} key={key}")
+
+        async def write():
+            while True:
+                writer = bft_network.random_client(without={ro_client})
+                await skvbc.send_write_kv_set(writer, [(key, skvbc.random_value())], )
+
+        async def read():
+            nonlocal num_reads
+            nonlocal num_read_timeouts
+            while True:
+                try:
+                    await skvbc.send_read_kv_set(ro_client, key)
+                except trio.TooSlowError:
+                    num_read_timeouts += 1
+                finally:
+                    num_reads += 1
+
+        with trio.move_on_after(seconds=10):
+            async with trio.open_nursery() as nursery:
+                nursery.start_soon(write)
+                nursery.start_soon(read)
+
+        # Make sure we haven't caused a view change
+        await bft_network.wait_for_view(replica_id=0,
+                                        expected=lambda v: v == 0,
+                                        err_msg="Check if we are still in the initial view.")
+
+        print(f"Read-only client requests:{num_reads} timeouts:{num_read_timeouts}")
+
+        self.assertLess(num_read_timeouts, num_reads, f"Read-only client requests:{num_reads} timeouts:{num_read_timeouts}")
 
 if __name__ == '__main__':
     unittest.main()
