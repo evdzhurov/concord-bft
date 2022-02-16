@@ -44,7 +44,7 @@ def start_replica_cmd(builddir, replica_id, view_change_timeout_milli="3000"):
            "-s", status_timer_milli,
            "-v", view_change_timeout_milli,
            "-x",
-           #"--enable-req-preprep-from-non-primary"
+           "--enable-req-preprep-from-non-primary"
            ]
     if replica_id == 0 :
         cmd.extend(["-g", "DropPrePreparesNoViewChangeStrategy,DropReadOnlyRepliesStrategy"])
@@ -54,7 +54,7 @@ class SkvbcByzantineReadOnlyLivenessAttackTest(ApolloTest):
 
     __test__ = False  # so that PyTest ignores this test scenario
 
-    @unittest.skip("Temp disabled")
+    @unittest.skip("skip for demo")
     @with_trio
     @with_bft_network(start_replica_cmd, selected_configs=lambda n, f, c: n == 4)
     @verify_linearizability(pre_exec_enabled=True, no_conflicts=True)
@@ -95,28 +95,30 @@ class SkvbcByzantineReadOnlyLivenessAttackTest(ApolloTest):
 
         ro_client = bft_network.random_client()
         key = skvbc.random_key()
-        num_reads = 0
-        num_read_timeouts = 0
 
-        print(f"ro_client={ro_client.client_id} key={key}")
+        num_writes = 0
+        num_reads = 0
+        num_failed_reads = 0
 
         async def write():
+            nonlocal num_writes
             while True:
                 writer = bft_network.random_client(without={ro_client})
-                await skvbc.send_write_kv_set(writer, [(key, skvbc.random_value())], )
+                kv = [(key, skvbc.random_value())]
+                await skvbc.send_write_kv_set(writer, kv)
+                num_writes += 1
 
         async def read():
             nonlocal num_reads
-            nonlocal num_read_timeouts
+            nonlocal num_failed_reads
             while True:
-                try:
-                    await skvbc.send_read_kv_set(ro_client, key)
-                except trio.TooSlowError:
-                    num_read_timeouts += 1
-                finally:
-                    num_reads += 1
+                await trio.sleep(0.5)
+                reply = await skvbc.send_read_kv_set(ro_client, key)
+                num_reads += 1
+                if reply is None:
+                    num_failed_reads += 1
 
-        with trio.move_on_after(seconds=10):
+        with trio.move_on_after(seconds=15):
             async with trio.open_nursery() as nursery:
                 nursery.start_soon(write)
                 nursery.start_soon(read)
@@ -126,9 +128,9 @@ class SkvbcByzantineReadOnlyLivenessAttackTest(ApolloTest):
                                         expected=lambda v: v == 0,
                                         err_msg="Check if we are still in the initial view.")
 
-        print(f"Read-only client requests:{num_reads} timeouts:{num_read_timeouts}")
+        print(f"Results: {num_writes} writes / {num_reads} reads / {num_failed_reads} failed reads")
 
-        self.assertLess(num_read_timeouts, num_reads, f"Read-only client requests:{num_reads} timeouts:{num_read_timeouts}")
+        self.assertEqual(num_failed_reads, 0, f"Read-only client number of failed reads: {num_failed_reads}")
 
 if __name__ == '__main__':
     unittest.main()
