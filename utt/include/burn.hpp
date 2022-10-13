@@ -61,6 +61,11 @@ class Burn {
    */
   const Coin& getCoin() const;
 
+  /**
+   * @brief Get the pid of the owner of the burned coin
+   */
+  const std::string& getOwnerPid() const;
+
  public:
   friend class libutt::api::CoinsSigner;
   friend class libutt::api::Client;
